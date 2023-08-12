@@ -7,6 +7,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"unicode/utf8"
 )
 
 // UserHandler 我准备在它上面定义跟用户有关的路由
@@ -152,6 +153,17 @@ func (u *UserHandler) Edit(ctx *gin.Context) {
 
 	var req EditReq
 	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+
+	//判断昵称的长度
+	if utf8.RuneCountInString(req.NickName) > 20 {
+		ctx.String(http.StatusOK, "昵称长度不能超过20个字符")
+		return
+	}
+
+	if utf8.RuneCountInString(req.Describe) > 100 {
+		ctx.String(http.StatusOK, "简介长度不能超过100个字符")
 		return
 	}
 
