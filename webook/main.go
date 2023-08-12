@@ -10,7 +10,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
-	"gorm.io/driver/mysql"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"strings"
 	"time"
@@ -29,14 +29,15 @@ func main() {
 func initWebServer() *gin.Engine {
 	server := gin.Default()
 
-	server.Use(func(ctx *gin.Context) {
-		println("这是第一个 middleware")
-	})
+	//server.Use(func(ctx *gin.Context) {
+	//	println("这是第一个 middleware")
+	//})
+	//
+	//server.Use(func(ctx *gin.Context) {
+	//	println("这是第二个 middleware")
+	//})
 
-	server.Use(func(ctx *gin.Context) {
-		println("这是第二个 middleware")
-	})
-
+	//处理跨域
 	server.Use(cors.New(cors.Config{
 		//AllowOrigins: []string{"*"},
 		//AllowMethods: []string{"POST", "GET"},
@@ -59,8 +60,9 @@ func initWebServer() *gin.Engine {
 	server.Use(sessions.Sessions("mysession", store))
 	// 步骤3
 	server.Use(middleware.NewLoginMiddlewareBuilder().
-		IgnorePaths("/users/signup").
-		IgnorePaths("/users/login").Build())
+		IgnorePaths("/users/signup"). //链式调用
+		IgnorePaths("/users/login").
+		Build())
 
 	// v1
 	//middleware.IgnorePaths = []string{"sss"}
@@ -74,6 +76,7 @@ func initWebServer() *gin.Engine {
 
 func initUser(db *gorm.DB) *web.UserHandler {
 	ud := dao.NewUserDAO(db)
+	//db.Debug() //开启debug模式
 	repo := repository.NewUserRepository(ud)
 	svc := service.NewUserService(repo)
 	u := web.NewUserHandler(svc)
@@ -81,7 +84,8 @@ func initUser(db *gorm.DB) *web.UserHandler {
 }
 
 func initDB() *gorm.DB {
-	db, err := gorm.Open(mysql.Open("root:root@tcp(localhost:13316)/webook"))
+	//db, err := gorm.Open(mysql.Open("root:root@tcp(localhost:13316)/webook"))
+	db, err := gorm.Open(sqlite.Open("webook.db"), &gorm.Config{})
 	if err != nil {
 		// 我只会在初始化过程中 panic
 		// panic 相当于整个 goroutine 结束

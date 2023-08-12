@@ -65,13 +65,13 @@ func CheckLogin() gin.HandlerFunc {
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
+
+		//已经登录, 如何
+
 	}
 }
 
-func CheckLoginV1(paths []string,
-	abc int,
-	bac int64,
-	asdsd string) gin.HandlerFunc {
+func CheckLoginV1(paths []string, abc int, bac int64, asdsd string) gin.HandlerFunc {
 	if len(paths) == 0 {
 		paths = []string{}
 	}

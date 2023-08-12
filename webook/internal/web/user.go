@@ -11,22 +11,26 @@ import (
 
 // UserHandler 我准备在它上面定义跟用户有关的路由
 type UserHandler struct {
-	svc         *service.UserService
+	svc         *service.UserService //组合service
 	emailExp    *regexp.Regexp
 	passwordExp *regexp.Regexp
+	birthdayExp *regexp.Regexp
 }
 
 func NewUserHandler(svc *service.UserService) *UserHandler {
 	const (
 		emailRegexPattern    = "^\\w+([-+.]\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*$"
 		passwordRegexPattern = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&])[A-Za-z\d$@$!%*#?&]{8,}$`
+		birthDayRegexPattern = `^(19|20)\d{2}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$`
 	)
 	emailExp := regexp.MustCompile(emailRegexPattern, regexp.None)
 	passwordExp := regexp.MustCompile(passwordRegexPattern, regexp.None)
+	birthDayExp := regexp.MustCompile(birthDayRegexPattern, regexp.None)
 	return &UserHandler{
 		svc:         svc,
 		emailExp:    emailExp,
 		passwordExp: passwordExp,
+		birthdayExp: birthDayExp,
 	}
 }
 
@@ -37,6 +41,7 @@ func (u *UserHandler) RegisterRoutesV1(ug *gin.RouterGroup) {
 	ug.POST("/edit", u.Edit)
 }
 
+// RegisterRoutes 路由注册
 func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug := server.Group("/users")
 	ug.GET("/profile", u.Profile)
@@ -132,10 +137,66 @@ func (u *UserHandler) Login(ctx *gin.Context) {
 	return
 }
 
+// Edit 编辑用户信息
 func (u *UserHandler) Edit(ctx *gin.Context) {
+
+	sess := sessions.Default(ctx)
+	userId := sess.Get("userId")
+
+	//定义请求的参数
+	type EditReq struct {
+		NickName string `json:"nickname"`
+		Describe string `json:"describe"`
+		BirthDay string `json:"birthday"`
+	}
+
+	var req EditReq
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+
+	ok, err := u.birthdayExp.MatchString(req.BirthDay) //使用正则去匹配
+	if err != nil {
+		// 记录日志, 可能是正则匹配超时了
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+
+	if !ok {
+		ctx.String(http.StatusOK, "生日不合法")
+		return
+	}
+
+	//调用service方法去编辑用户
+	err = u.svc.Edit(ctx, domain.User{
+		NickName: req.NickName,
+		BirthDay: req.BirthDay,
+		Describe: req.Describe,
+	}, userId.(int64))
+
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+
+	ctx.String(http.StatusOK, "编辑成功")
 
 }
 
+// Profile 获取用户信息
 func (u *UserHandler) Profile(ctx *gin.Context) {
-	ctx.String(http.StatusOK, "这是你的 Profile")
+	sess := sessions.Default(ctx)
+	userId := sess.Get("userId")
+	profile, err := u.svc.Profile(ctx, userId.(int64))
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{
+		"id":       profile.Id,
+		"email":    profile.Email,
+		"nickName": profile.NickName,
+		"birthDay": profile.BirthDay,
+		"describe": profile.Describe,
+	})
 }
