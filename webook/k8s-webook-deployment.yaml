@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webook
+  labels:
+    app: webook
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: webook
+  template:
+    metadata:
+      name: webook
+      labels:
+        app: webook
+    spec:
+      containers:
+        - name: webook
+          image: sjs/webook:v0.0.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+      restartPolicy: Always
+      

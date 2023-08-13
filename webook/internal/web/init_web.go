@@ -6,7 +6,7 @@ import (
 
 func RegisterRoutes() *gin.Engine {
 	server := gin.Default()
-	registerUsersRoutes(server)
+	//registerUsersRoutes(server)
 	return server
 }
 

@@ -6,14 +6,16 @@ import (
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"net/http"
+	"time"
 	"unicode/utf8"
 )
 
 // UserHandler 我准备在它上面定义跟用户有关的路由
 type UserHandler struct {
 	svc         *service.UserService //组合service
-	emailExp    *regexp.Regexp
+	emailExp    *regexp.Regexp       //组合正则表达式
 	passwordExp *regexp.Regexp
 	birthdayExp *regexp.Regexp
 }
@@ -35,19 +37,20 @@ func NewUserHandler(svc *service.UserService) *UserHandler {
 	}
 }
 
-func (u *UserHandler) RegisterRoutesV1(ug *gin.RouterGroup) {
-	ug.GET("/profile", u.Profile)
-	ug.POST("/signup", u.SignUp)
-	ug.POST("/login", u.Login)
-	ug.POST("/edit", u.Edit)
-}
+//func (u *UserHandler) RegisterRoutesV1(ug *gin.RouterGroup) {
+//	ug.GET("/profile", u.Profile)
+//	ug.GET("/profileJwt", u.ProfileJwt)
+//	ug.POST("/signup", u.SignUp)
+//	ug.POST("/login", u.loginJwt)
+//	ug.POST("/edit", u.Edit)
+//}
 
 // RegisterRoutes 路由注册
 func (u *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug := server.Group("/users")
-	ug.GET("/profile", u.Profile)
+	ug.GET("/profile", u.ProfileJwt)
 	ug.POST("/signup", u.SignUp)
-	ug.POST("/login", u.Login)
+	ug.POST("/login", u.loginJwt)
 	ug.POST("/edit", u.Edit)
 }
 
@@ -138,6 +141,42 @@ func (u *UserHandler) Login(ctx *gin.Context) {
 	return
 }
 
+func (u *UserHandler) loginJwt(ctx *gin.Context) {
+	type loginJwtReq struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	var req loginJwtReq
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+	//登录的时候直接返回jwt, 是返回在响应头中还是返回在响应体中?
+	//判断是否登录成功
+	user, err := u.svc.Login(ctx, req.Email, req.Password)
+	if err != nil {
+		ctx.String(http.StatusOK, "用户名或者密码错误")
+		return
+	}
+	//生成token, 这边怎么生成过期时间?
+	claims := UserClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 2)),
+		},
+		UserId: user.Id,
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims) //传入自定义载荷
+	mySigningKey := []byte("AllYourBase")
+	tokenString, err := token.SignedString(mySigningKey)
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误(jwt)")
+		return
+	}
+
+	ctx.String(http.StatusOK, tokenString)
+
+}
+
 // Edit 编辑用户信息
 func (u *UserHandler) Edit(ctx *gin.Context) {
 
@@ -211,4 +250,34 @@ func (u *UserHandler) Profile(ctx *gin.Context) {
 		"birthDay": profile.BirthDay,
 		"describe": profile.Describe,
 	})
+}
+
+func (u *UserHandler) ProfileJwt(ctx *gin.Context) {
+	claims, ok := ctx.Get("claims") //从上下文中获取载荷,
+	if !ok {
+		//未登录
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+	//sess := sessions.Default(ctx)
+	//userId := sess.Get("userId")
+
+	profile, err := u.svc.Profile(ctx, claims.(*UserClaims).UserId) //这边存的就是个指针,所以断言的时候这边也要是个指针
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{
+		"id":       profile.Id,
+		"email":    profile.Email,
+		"nickName": profile.NickName,
+		"birthDay": profile.BirthDay,
+		"describe": profile.Describe,
+	})
+}
+
+// UserClaims 自定义载荷
+type UserClaims struct {
+	jwt.RegisteredClaims       //使用默认的一个实现类, 匿名组合
+	UserId               int64 //自定义一个结构体去存放自定义的载荷
 }

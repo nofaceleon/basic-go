@@ -7,9 +7,8 @@ import (
 	"gitee.com/geekbang/basic-go/webook/internal/web"
 	"gitee.com/geekbang/basic-go/webook/internal/web/middleware"
 	"github.com/gin-contrib/cors"
-	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"strings"
@@ -19,24 +18,28 @@ import (
 func main() {
 	db := initDB()
 	server := initWebServer()
-
 	u := initUser(db)
 	u.RegisterRoutes(server)
+	//server := gin.Default()
+	//
+	//server.GET("/hello", func(ctx *gin.Context) {
+	//	ctx.String(http.StatusOK, "hello world")
+	//	return
+	//})
 
 	server.Run(":8080")
 }
 
+func initRedis() *redis.Client {
+	return redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "",
+		DB:       0,
+	})
+}
+
 func initWebServer() *gin.Engine {
 	server := gin.Default()
-
-	//server.Use(func(ctx *gin.Context) {
-	//	println("这是第一个 middleware")
-	//})
-	//
-	//server.Use(func(ctx *gin.Context) {
-	//	println("这是第二个 middleware")
-	//})
-
 	//处理跨域
 	server.Use(cors.New(cors.Config{
 		//AllowOrigins: []string{"*"},
@@ -56,14 +59,16 @@ func initWebServer() *gin.Engine {
 	}))
 
 	// 步骤1
-	store := cookie.NewStore([]byte("secret"))
-	server.Use(sessions.Sessions("mysession", store))
+	//store := cookie.NewStore([]byte("secret"))
+	//server.Use(sessions.Sessions("mysession", store))
 	// 步骤3
-	server.Use(middleware.NewLoginMiddlewareBuilder().
-		IgnorePaths("/users/signup"). //链式调用
-		IgnorePaths("/users/login").
-		Build())
 
+	//这边是进行登录校验的地方
+	server.Use(middleware.NewLoginMiddlewareBuilder().
+		IgnorePaths("/users/signup"). //拼接不需要进行登录校验的地方
+		IgnorePaths("/users/login").
+		IgnorePaths("/users/loginJwt").
+		Build())
 	// v1
 	//middleware.IgnorePaths = []string{"sss"}
 	//server.Use(middleware.CheckLogin())
