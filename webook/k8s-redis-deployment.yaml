@@ -1,25 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: webook
+  name: webook-redis
   labels:
-    app: webook
+    app: webook-redis
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
-      app: webook
+      app: webook-redis
   template:
     metadata:
-      name: webook
+      name: webook-redis
       labels:
-        app: webook
+        app: webook-redis
     spec:
       containers:
-        - name: webook
-          image: sjs/webook:v0.0.4
+        - name: webook-redis
+          image: redis:latest
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8080
+            - containerPort: 6379
       restartPolicy: Always
-      
+

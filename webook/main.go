@@ -1,6 +1,7 @@
 package main
 
 import (
+	"gitee.com/geekbang/basic-go/webook/internal/config"
 	"gitee.com/geekbang/basic-go/webook/internal/repository"
 	"gitee.com/geekbang/basic-go/webook/internal/repository/dao"
 	"gitee.com/geekbang/basic-go/webook/internal/service"
@@ -9,8 +10,9 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
-	"gorm.io/driver/sqlite"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -21,18 +23,12 @@ func main() {
 	u := initUser(db)
 	u.RegisterRoutes(server)
 	//server := gin.Default()
-	//
-	//server.GET("/hello", func(ctx *gin.Context) {
-	//	ctx.String(http.StatusOK, "hello world")
-	//	return
-	//})
-
 	server.Run(":8080")
 }
 
 func initRedis() *redis.Client {
 	return redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
+		Addr:     config.Config.Redis.Addr,
 		Password: "",
 		DB:       0,
 	})
@@ -57,6 +53,11 @@ func initWebServer() *gin.Engine {
 		},
 		MaxAge: 12 * time.Hour,
 	}))
+
+	server.GET("/hello", func(ctx *gin.Context) {
+		ctx.String(http.StatusOK, "hello world")
+		return
+	})
 
 	// 步骤1
 	//store := cookie.NewStore([]byte("secret"))
@@ -89,8 +90,9 @@ func initUser(db *gorm.DB) *web.UserHandler {
 }
 
 func initDB() *gorm.DB {
-	//db, err := gorm.Open(mysql.Open("root:root@tcp(localhost:13316)/webook"))
-	db, err := gorm.Open(sqlite.Open("webook.db"), &gorm.Config{})
+	//使用mysql
+	db, err := gorm.Open(mysql.Open(config.Config.DB.DSN))
+	//db, err := gorm.Open(sqlite.Open("webook.db"), &gorm.Config{})
 	if err != nil {
 		// 我只会在初始化过程中 panic
 		// panic 相当于整个 goroutine 结束
